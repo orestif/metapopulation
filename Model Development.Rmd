@@ -1,0 +1,427 @@
+---
+title: "Metapopulation Model Development"
+author: "Olivier Restif"
+date: "Created 1 June 2015"
+output: 
+  html_document: 
+    fig_caption: yes
+    number_sections: yes
+    theme: readable
+---
+
+_Last updated `r format(Sys.Date(), "%e %B %Y")`_
+
+
+# Objectives
+
+**The aim is to explore theoretically the effect of birth pulses on the persistence of a pathogen in a metapopulation.**
+
+The hypothesis is that tight, synchronous birth pulses may favour pathogen extinction.
+
+The study is loosely motivated by bat virus studies, in particular related to Raina Plowright's and Ali Peel's work on Hendra in Australia. The model structure extends a number of previous theoretical studies, most notably:
+
+* Peel et al. (2014): stochastic SIR model with birth pulse in a single population,
+* Cross et al. (2005, 2007): stochastic SIR model in a lattice metapopulation with basic demography,
+* Plowright et al (2011): stochastic SEIR metapopulation model parametrised for Hendra in Australian flying foxes (including birth pulse and maternal immunity), focusing on recurrent epidemics.
+
+__--------------------------------------------------------------------------------------------__
+
+# Model structure
+
+
+## Key assumptions
+
+* Within-patch demography:
+	+ Seasonal birth pulse using Gaussian function
+	+ Constant (possibly density-dependent) death rate
+* Within-patch infection dynamics:
+	+ Frequency-dependent transmission
+	+ Simple recovery
+* Migration among patches:
+	+ Constant migration rate
+
+## Equations
+
+### Birth rate 
+
+The birth pulse follows the periodic Gaussian function defined in Peel et al (2014), with a few minor variations: 
+
+$$B(t) = k\,e^{-s \sin^{2}[\pi (t -\tau)]}$$
+
+* $k$ can be used to set the annual fecundity $\langle B\rangle$ to the desired value.
+* We use `sin()` instead of `cos()` so that the peak time of the birth pulse occurs at time $t = \tau$.
+* The pulse tightness $s$ and pahse $\tau$ can vary among patches
+
+ __WARNING__ There is an unfortunate effect of coupling populations with asynchronous birth pulses, even with a cosine birth pulse (see Mathematica notebook): the populations feed each other, creating a kind of reasonance in the form of an exponential increase in population size. The rate of this exponential growth varies non-monotonically with the migration rate: very low or very high migration rates cause very slow growth, whereas migration rates in the area of 0.1-10 per year can produce exponential growth rates in excess of 0.01 per year. The growth rate is maximum when the birth pulses are out-of-phase by 6 months ($\pi$ rad), and is null when they are in phase. Likewise, differences in birth pulse amplitudes can create exponential growth at intermediate migration rates, even if the pulses are in phase.
+ 
+* The effect should be negligible (at least over a few decades) if migration rates are kept below 0.01 per year. 
+* A simple solution is to impose a density-dependent death rate in each patch, but this may produce dynamics in a single patch that differ from Peel et al (2014). Also, the relation between the death rate and lifespan becomes muddled.
+
+Illustration: **TBD**
+
+
+### Deterministic model (July 2015)
+
+**Population dynamics:**
+
+$$
+{N'_i}\left( t \right) = \left[ b_i(t) - d_i - \frac{N_i(t)}{\nu_i} \right] \frac{N_i(t)}{\lambda} + \mu \sum\limits_j {\left( \delta _{j,i} N_j\left( t \right) - \delta _{i,j}N_i\left( t \right) \right)} 
+$$
+
+* $b_i(t)$ is the **normalised birth rate**: $\langle b_i \rangle = 1$. Specifically, $b_i(t) = \frac{e^{-s \sin^{2}[\pi (t -\tau)]}}{e^{-s/2} I_0(s/2)}$ where the normalising constant at the denominator can be computed in `R` as `besselI(s/2,0,T)`.
+* In the absence of migration, the population in a single patch should converge to stable cycles with yearly average: $N_{eq} = \nu(1-d)$, hence $\nu$ **is the carrying capacity in the absence of density-independent death** ($d=0$). 
+* $\lambda$ is the **average life-span** when $N=N_{eq}$: $P'(t) = (-d-N_{eq}/\nu)P/\lambda$ leads to $P(t)=1-e^{(-t/\lambda)}$.
+* The average yearly fecundity is $1/\lambda$.
+* The original model (as per Peel et al. 2014) can be recovered by setting $\nu=\infty$, $d=1$ and treating $1/\lambda$ as the per-capita death rate.
+* $\delta_{i,j} = 1$ if migration can occur from patch $i$ to patch $j$, and 0 otherwise.
+* $\mu$ is the migration rate per capita and per migration path (directional edge).
+
+**Infection dynamics (one strain):**
+
+$$
+\begin{array}{lcl}
+{{S'}_i}\left( t \right) = \frac{{{b_i}\left( t \right)}}{\lambda }{N_i}\left( t \right) & - \beta \frac{{{S_i}\left( t \right){I_i}\left( t \right)}}{{{N_i}\left( t \right)}} & - \left[ {{d_i} + \frac{{{N_i}\left( t \right)}}{{{\nu _i}}}} \right]\frac{{{S_i}\left( t \right)}}{\lambda } + \mu \sum\limits_j {\left( {{\delta _{j,i}}{S_j}\left( t \right) - {\delta _{i,j}}{S_i}\left( t \right)} \right)} \\
+{{I'}_i}\left( t \right) = & \beta \frac{{{S_i}\left( t \right){I_i}\left( t \right)}}{{{N_i}\left( t \right)}} - \gamma {I_i}\left( t \right) & - \left[ {{d_i} + \frac{{{N_i}\left( t \right)}}{{{\nu _i}}}} \right]\frac{{{I_i}\left( t \right)}}{\lambda } + \mu \sum\limits_j {\left( {{\delta _{j,i}}{I_j}\left( t \right) - {\delta _{i,j}}{I_i}\left( t \right)} \right)} \\
+{{R'}_i}\left( t \right) = & \gamma {I_i}\left( t \right) & - \left[ {{d_i} + \frac{{{N_i}\left( t \right)}}{{{\nu _i}}}} \right]\frac{{{R_i}\left( t \right)}}{\lambda } + \mu \sum\limits_j {\left( {{\delta _{j,i}}{R_j}\left( t \right) - {\delta _{i,j}}{R_i}\left( t \right)} \right)} 
+\end{array}
+$$
+
+Basic reproductive ratio: $\mathbf{R}_0 = \frac{\beta}{\gamma + 1/\lambda}$
+
+## Stochastic, event-based model:
+
+__Algorithm:__ 
+
+* Adaptive tau-leap
+
+* Coding: A current issue is the difficulty to parallelise stochastic simulations in C++.
+	+ In R, parallel PRNG can be used using the L'Ecuyer algorithm provided in `parallel`. _It may be possible to call an `RCpp` function within_ `mcparallel()` _provided correct use of R's RNG within._
+	+ In `RCpp`, initialise PRNG by defining an `RNGScope` object.
+	+ See [previous note](file:///Users/or226/Documents/Work/Research/Salmonella/Chris%20WITS/Models/Report_on_Bayesian_model_fitting.html) from January 2015 about the issue, with possible use of TRNG in OpenMP. _As of June 2015, I haven't managed to use OpenMP on Mac OS_.
+	
+
+__--------------------------------------------------------------------------------------------__
+
+# Numerical implementation of the model
+
+## Stochastic model
+
+Previous experience suggests C++ is always much faster than R for simulations. The only pending issue is parallelisation.
+
+### Adaptivetau package
+
+Efficient, underlying code in C++. It uses R's standard PRNG, which should allow parallelisation with L'Ecuyer RNG. See `parallel::mcparallel`.
+
+David Bradley used the `foreach` package with `adaptivetau` and reported speed gain. However, he did not comment on the issue of independent PRN.
+
+Unless stated otherwise, the results below were obtained using the `adaptivetau` package.
+
+**WARNING**: large tau-leaps can occur when all the variables have high values, which can create substantial errors with time-dependent parameters such as a bith pulse. It is imperative to set a reasonable cap to the tau leap function, keeping in mind this can slow down simulations substantially.
+
+Illustration: **TBD**
+
+### Homemade adaptive-tau C++ code
+
+TBD
+
+## Deterministic model
+
+The model definition for `adaptivetau` can be easily converted into a deterministic model using `ode()` from package `deSolve`: the vector of derivatives is equal to the product of the transition matrix by the state vector.
+
+## Numerical values
+
+* Parameter values Guided by Peel et al (2014)
+* Metapopulation contact matrix: ring structure
+* Initial population size in each patch calculated using deterministic birth-pulse model (in the absence of infection and migration) to achieve a stable yearly average.
+* 
+
+
+
+
+__--------------------------------------------------------------------------------------------__
+
+# Results with density-independent death rate
+
+This model is a simple extension of Peel et al (2014) with coupling by migration. Migration rates are kept fairly low (up to 0.01 per year) to minimise population growth when birth pulses are out-of-phase. The effect on extinction rates should be negligible in the first 10 years.
+
+## Simulation Series 2 - 17 June 2015
+
+Source file: ["Metapop Series 2.R"](file:///Users/or226/Documents/Work/Research/Bats/Metapopulation/Metapop Series 2.R)
+
+```{r, echo=FALSE, message=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(doParallel)
+load('Metapop Series 2.RData')
+```
+
+Two patches, lifespan = `r par.1$span` year, $R_0$ = `r par.1$R0`, infectious period = `r par.1$IP*365` days, birth peak in patch 1: `r par.1$tau[1]`. Infection seeded with 1 case in patch 1. 
+
+
+Parameters varied:
+
+* $s$ (birth pulse coefficient): `r s.try`
+* $\tau_{2}$ (peak time in patch 2): `r tau2.try`
+* $\mu$ (migration rate): `r mu.try`
+* $N$ (average population size in each patch): `r N.try`
+
+For each of the `r nrow(par.try)` combinations, `r nrow(sim.series.2)` simulations were run for 20 years.
+
+### Extinction
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+sim.2.results <- as.data.frame(par.try)
+sim.2.results$ext.NA <- apply(sim.series.2,2,function(x) length(which(is.na(x))))
+
+# Data formatting
+rownames(sim.series.2) <- 1:nrow(sim.series.2)
+colnames(sim.series.2) <- rep('Time',ncol(sim.series.2))
+sim.2.all <- cbind(sim.2.results,t(sim.series.2))
+sim.2.ext <- gather(sim.2.all,Simulation,Extinction,6:5005,convert=T)
+
+```
+
+```{r, echo=FALSE, fig.width=9, fig.cap="Figure 1. Probability of pathogen extinction within 20 years in the metapopulation. In the presence of birth pulses (s >= 10), out of phase birth pulses and greater migration rates promote pathogen persistence."}
+ggplot(sim.2.results,aes(factor(mu),factor(tau))) + geom_tile(aes(fill=1-ext.NA/5000)) + facet_grid(N~s, labeller=label_both) + labs(fill='P(extinction)') + scale_fill_continuous(low='darkred',high='white')
+```
+
+
+```{r, echo=FALSE, fig.width=9, warning=FALSE, fig.cap="Figure 2. Distribution of the time to extinction (cropped to first 5 years as very little happens after that), with mu=0.01."}
+ggplot(filter(sim.2.ext,mu==0.01 & s>2),aes(factor(tau),Extinction,fill=1-ext.NA/5000)) + geom_violin() + facet_grid(N~s, labeller=label_both) + coord_flip(ylim=c(0,5))+ labs(fill='P(extinction)') + scale_fill_continuous(low='darkred',high='white')
+```
+
+
+## Simulation Series 3 - 2 July 2015
+
+### Deterministic dynamics
+
+**Series 3 extended**: Ran deSolve across a large grid of parameter values with 2 to 8 patches on a ring. The local birth pulse determines the phase of epidemic cycles in each patch, irrespective of the migration rate. 
+
+Shiny markdown [file](file:///Users/or226/Documents/Work/Research/Bats/Metapopulation/Metapop_Shiny/Simulations Shiny 5.Rmd).
+
+### Stochastic simulations
+
+Source file: ["Metapop Series 3.R"](file:///Users/or226/Documents/Work/Research/Bats/Metapopulation/Metapop Series 3.R)
+
+```{r, echo=FALSE}
+rm(list = ls())
+load('Metapop Series 3.RData')
+sim.dir <- '~/Documents/Repository/Metapopulation/Series_3'
+
+```
+
+Lifespan = `r par.3$span` year, $R_0$ = `r par.3$R0`, infectious period = `r par.3$IP*365` days, birth peak in patch 1: `r par.3$tau`, migration rate: `r par.3$mu`, peak sharpness `r par.3$s`. Infection seeded with 1 case in patch 1. 
+
+Parameters varied:
+
+* Number of patches: `r meta.try`, arranged in a circular geometry.
+* Maximum phase variation in birth peak across the metapopulation: `r tau.max.try`, with a linear gradient from 0.5 in patch 1.
+* $N$ (average population size in each patch): `r N.try`
+
+For each of the `r nrow(par.try)` combinations, `r nrow(sim.series.3)` simulations were run for 20 years.
+
+Run time: 48 hours on 15 cores on or226.
+
+**Note (3 July):** extinctions were not recorded properly in the `sim.series.3` object. I have re-calculated individually from the RData files. The correct version of `sim.series.3` has been added to the file 'Metapop Series 3.RData'.
+
+### View time-series
+
+Uploaded simulations (100 per parameter combination) on [shinyapp.io](https://or226.shinyapps.io/Sim_series_3/Sim_series_3.Rmd)
+
+### Extinction
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# sim.series.3 <- read.csv('~/Documents/Repository/Metapopulation/Series_3/Extinctions.csv')[,-1]
+sim.3.results <- as.data.frame(par.try)
+sim.3.results$ext.NA <- apply(sim.series.3,2,function(x) length(which(is.na(x))))
+
+# Data formatting
+rownames(sim.series.3) <- 1:nrow(sim.series.3)
+colnames(sim.series.3) <- rep('Time',ncol(sim.series.3))
+sim.3.all <- cbind(sim.3.results,t(sim.series.3))
+sim.3.ext <- gather(sim.3.all,Simulation,Extinction,5:5004,convert=T)
+```
+
+```{r, echo=FALSE, fig.width=9, fig.cap="Figure 3. Probability of pathogen extinction within 20 years in the metapopulation. Note that N is the size of every patch: hence the total metapopulation size is the same in 4x5000 and 2x1000, etc."}
+ggplot(sim.3.results,aes(factor(Patches),factor(tau.max))) + geom_tile(aes(fill=1-ext.NA/5000)) + facet_grid(N~., labeller=label_both) + labs(fill='P(extinction)') + scale_fill_continuous(low='darkred',high='white')
+```
+
+
+```{r, echo=FALSE, fig.width=9, warning=FALSE, fig.cap="Figure 4. Distribution of the time to extinction (cropped to first 6 years as very little happens after that), with mu=0.0$."}
+ggplot(sim.3.ext,aes(factor(tau.max),Extinction,fill=1-ext.NA/5000)) + geom_violin() + facet_grid(N~Patches, labeller=label_both) + coord_flip(ylim=c(0,6))+ labs(fill='P(extinction)') + scale_fill_continuous(low='darkred',high='white')
+```
+
+
+### Spatiotemporal dynamics
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+series.3.mean.occupancy <- cbind(as.data.frame(par.try),read.csv(file.path(sim.dir,'Mean_Occupancy.csv')))
+colnames(series.3.mean.occupancy)[4:2004] <- seq(0,20,0.01)
+series.3.mo <- gather(series.3.mean.occupancy,Time,Mean,4:2004,convert=T)
+rm(series.3.mean.occupancy)
+series.3.mo.thin <- filter(series.3.mo,round(Time*100)%%10==0)
+```
+
+```{r, echo=FALSE, fig.width=12, fig.cap="Figure 5. Average (across all simulations) proportion of infected patches through time. Blue line: all patches in sync; green line: 3 month phase variation across the metapopulation; red line: 6 month phase variation across the metapopulation."}
+ggplot(series.3.mo.thin, aes(Time,Mean/Patches)) + geom_line(aes(color=factor(tau.max))) + facet_grid(N~Patches, labeller=label_both)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+series.3.cond.mean.occupancy <- cbind(as.data.frame(par.try),read.csv(file.path(sim.dir,'Cond_Mean_Occupancy.csv')))
+colnames(series.3.cond.mean.occupancy)[4:2004] <- seq(0,20,0.01)
+series.3.cond.mo <- gather(series.3.cond.mean.occupancy,Time,Mean,4:2004,convert=T)
+rm(series.3.cond.mean.occupancy)
+series.3.cond.mo.thin <- filter(series.3.cond.mo,round(Time*100)%%10==0)
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.width=12, fig.cap="Figure 6. Average (across all simulations) proportion of infected patches through time, conditional on non-extinction. Blue line: all patches in sync; green line: 3 month phase variation across the metapopulation; red line: 6 month phase variation across the metapopulation."}
+ggplot(series.3.cond.mo.thin, aes(Time,Mean/Patches)) + geom_line(aes(color=factor(tau.max))) + facet_grid(N~Patches, labeller=label_both)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+series.3.dist.occupancy <- read.csv(file.path(sim.dir,'Dist_Occupancy.csv'))
+colnames(series.3.dist.occupancy)[5:205] <- seq(0,20,0.1)
+series.3.do <- gather(series.3.dist.occupancy,Time,Freq,5:205,convert=T)
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.width=12, fig.cap="Figure 7. Distribution of the number of infected patches through time, shown for N=5000."}
+ggplot(filter(series.3.do,N==5000), aes(Time,Freq)) + geom_area(aes(fill=factor(Occupied))) + facet_grid(tau.max~Patches, labeller=label_both)
+```
+
+
+```{r, echo=F}
+load('Series_3_cor.RData') # Object sim_3_cor (list ordered along par.try)
+
+# Select series with 8 patches and N=10,000
+cor.sel <- with(par.try,which(N==10000 & Patches==8))
+sub.cor <- foreach(i=cor.sel, .combine=rbind) %do% {
+	rownames(sim_3_cor[[i]]) <- paste('I',1:(par.try$Patches[i]),sep='')
+	data.frame(Patches=par.try$Patches[i], tau.max=par.try$tau.max[i], N=par.try$N[i], sim=1:ncol(sim_3_cor[[i]]),t(sim_3_cor[[i]]))
+	}
+sub.cor.table <- gather(sub.cor,"p","cor",5:12,convert = T)
+rm(sub.cor)
+```
+
+```{r, echo=FALSE, warning=FALSE, fig.cap="Figure 8. Distribution of correlation coefficients between I1 (time-series of number of infected individuals in patch 1) and each of the other In (n=2..8). Each boxplot represents the distribution of correlation coefficients across 5000 simulations. The time-series were cropped, removing the first year of each simulation. "}
+ggplot(sub.cor.table,aes(p,cor)) + geom_boxplot() + facet_grid(tau.max ~ ., labeller=label_both)
+```
+
+
+
+## Series 4: heterogeneous birth pulse tightness
+
+Hypothesis: Patches with lower seasonality could act as reservoirs due to their lower CCS (Peel et al 2014).
+
+Ran 8 series of 1000 simulations, with 2 or 4 patches of size 1000. Patch 1 has no birth pulse (s=0) and was seeded with 1 case. Migration rate was 0.01 per year, lifespan 1 year, R0=4 and infectious period = 1 month. All other patches have birth pulse, with s in the opposite patch ranging from 0 to 100.
+
+### Extinction
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+load("~/Documents/Work/Research/Bats/Metapopulation/Metapop Series 4.RData")
+n.sim <- ncol(sim.series.4)
+sim.4.results <- as.data.frame(par.try[1:n.run,])
+sim.4.results$ext.NA <- apply(sim.series.4,1,function(x) length(which(is.na(x))))
+
+# Data formatting
+rownames(sim.series.4) <- 1:nrow(sim.series.4)
+colnames(sim.series.4) <- 1:ncol(sim.series.4)
+sim.4.all <- cbind(sim.4.results,sim.series.4)
+sim.4.ext <- gather(sim.4.all,Simulation,Extinction,-(1:4),convert=T)
+```
+
+```{r, echo=FALSE, fig.width=6, fig.cap="Figure 9. Probability of pathogen extinction within 20 years in the metapopulation."}
+ggplot(sim.4.results,aes(factor(s.max),1-ext.NA/n.sim)) + geom_point(aes(color=factor(Patches)),size=4) + coord_cartesian(ylim=c(0,0.5)) + ylab("Frequency of extinction") + xlab("Maximum birth pulse tightness (s)") + geom_hline(yintercept=1/par.4$R0, linetype=2) + geom_hline(yintercept=qbinom(c(0.025,0.975),n.sim,1/par.4$R0)/n.sim, linetype=3)
+```
+
+
+```{r, echo=FALSE, fig.width=6, warning=FALSE, fig.cap="Figure 10. Distribution of the time to extinction (cropped to first year as very little happens after that), with mu=0.0$."}
+ggplot(sim.4.ext,aes(factor(s.max),Extinction)) + geom_violin() + facet_grid(.~Patches, labeller=label_both) + coord_flip(ylim=c(0,1))
+```
+
+
+### Spatiotemporal dynamics
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+series.4.cond.mean.occupancy <- cbind(as.data.frame(par.try[1:n.run,]),read.csv(file.path(sim.dir,'Cond_Mean_Occupancy.csv')))
+colnames(series.4.cond.mean.occupancy)[-(1:3)] <- seq(0,20,0.01)
+series.4.cmo <- gather(series.4.cond.mean.occupancy,Time,Mean,4:2004,convert=T)
+rm(series.4.cond.mean.occupancy)
+series.4.cmo.thin <- filter(series.4.cmo,round(Time*100)%%10==0)
+```
+
+```{r, echo=FALSE, fig.width=9, fig.cap="Figure 10. Average (conditional on non-extinction) proportion of infected patches through time. Red line: all patches have uniform birth (no pulse)."}
+ggplot(series.4.cmo.thin, aes(Time,Mean)) + geom_line(aes(color=factor(s.max))) + facet_grid(.~Patches, labeller=label_both) + ylab("Mean number of patches infected") + coord_cartesian(ylim=c(1,4))
+```
+
+
+
+
+__--------------------------------------------------------------------------------------------__
+
+# Results with density-dependent death rate
+
+Source [file](file:///Users/or226/Documents/Work/Research/Bats/Metapopulation/Metapop DDD SIR adaptivetau.R).
+
+## Deterministic dynamics - Series 1 
+
+Comparison between the DDD and DID models show virtually identical infection dynamics (based on the same values for life span, infectious period, R0, s, tau and mu), but the DDD model prevents the increase in population size with high migration rate and asynchronous birth pulses. See shiny file.
+
+## Stochastic dynamics - Series 1
+
+
+
+
+__--------------------------------------------------------------------------------------------__
+
+# Results with two competing strains and DDD
+
+Source [file](file:///Users/or226/Documents/Work/Research/Bats/Metapopulation/Metapop DDD SIR 2 adaptivetau.R).
+
+
+
+
+__--------------------------------------------------------------------------------------------__
+
+# What's next?
+
+## Other analyses
+
+- Compare periodicity (frequency and phase) of $N_i(t)$, $I_i(t)$, $\Sigma N_i(t)$ and $\Sigma I_i(t)$.
+	+ In the deterministic model, strict annual periodicity following short transient period.
+	+ Stochastic simulations just above the CCS show more irregular patterns, probably driven by local extinctions.
+
+- Estimate lag between patches
+
+### Further series
+
+- Can high migration rates reduce phase variations?
+	+ The deterministic model suggests this may not be the case, at least when all patches have the same pulse tightness $s$. 
+- Geographic variation in pulse tightness.
+- Effect of fragmentation (keep total N constant).
+- Other geometries:
+	+ Source-sink dynamics
+	+ linear network
+- Other parameter sets:
+	+ longer life-span 
+	+ lower R0
+	
+### Empirical motivation
+
+- Review case studies to identify relevant questions
+	
+### Pathogen evolution
+
+A simple idea would be to consider the $\beta-\gamma$ trade-off: for a given $R_0$, is a longer infectious period advantageous?
+
+- Peel et al (2014): in a closed population, the CCS increases exponentially with the recovery rate.
+
+- van Ballegoijen and Boerlijst(2004): lattice SIRS model with competing strains varying in transmission rate and infectious periods. Selection maximises outbreak frequency rather than $R_0$.
+
+- Read and Keeling (2007): two-strain competition SIR model along an $R_0$ isocline in the $\beta-\gamma$ space. Stochastic simulations produce a bimodal fitness landscape. Slightly odd competition model.
+
+- Of marginal interest, two modelling papers considered the emergence of a $\beta-\gamma$ trade-off from within-host dynamics: Alizon (2008) and King et al (2009).
+
+Here it would probably make sense to introduce two different strains in two different patches. 
