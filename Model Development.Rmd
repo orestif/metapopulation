@@ -33,12 +33,13 @@ __------------------------------------------------------------------------------
 
 * Within-patch demography:
 	+ Seasonal birth pulse using Gaussian function
-	+ Constant (possibly density-dependent) death rate
+	+ Constant or density-dependent death rate
 * Within-patch infection dynamics:
 	+ Frequency-dependent transmission
 	+ Simple recovery
 * Migration among patches:
 	+ Constant migration rate
+	+ User-defined directions of flows among sub-populations
 
 ## Equations
 
@@ -102,7 +103,7 @@ __Algorithm:__
 
 __--------------------------------------------------------------------------------------------__
 
-# Numerical implementation of the model
+# Implementation of the model
 
 ## Stochastic model
 
@@ -135,7 +136,17 @@ The model definition for `adaptivetau` can be easily converted into a determinis
 * Initial population size in each patch calculated using deterministic birth-pulse model (in the absence of infection and migration) to achieve a stable yearly average.
 * 
 
+## Source files
 
+As of `r format(Sys.Date(), "%e %B %Y")`, three versions of the model have been implemented:
+
+- "Metapop SIR adaptivetau.R": original model (based on Peel et al 2014) with Gaussian birth rate, constant (density-independent) death rate, frequency-dependent transmission (SIR), and explicit migration across a network of subpopulations.
+
+- "Metapop DDD SIR adaptivetau.R": adds a second, density-dependent mortality term to prevent exponential increase in population sizes when birth pulses vary across the metapopulation.
+
+- "Metapop DDD SIR adaptivetau.R": extension to two pathogen strains with no antigenic variations (perfect cross-protection).
+
+All other files containing the word "series" have been used to run series of simulations from each of tht three models, or analyse the resulting simulations. 
 
 
 __--------------------------------------------------------------------------------------------__
@@ -143,6 +154,8 @@ __------------------------------------------------------------------------------
 # Results with density-independent death rate
 
 This model is a simple extension of Peel et al (2014) with coupling by migration. Migration rates are kept fairly low (up to 0.01 per year) to minimise population growth when birth pulses are out-of-phase. The effect on extinction rates should be negligible in the first 10 years.
+
+Source file: "Metapop SIR adaptivetau.R"
 
 ## Simulation Series 2 - 17 June 2015
 
@@ -371,7 +384,7 @@ Comparison between the DDD and DID models show virtually identical infection dyn
 
 ## Stochastic dynamics - Series 1
 
-
+TBD.
 
 
 __--------------------------------------------------------------------------------------------__
@@ -380,6 +393,23 @@ __------------------------------------------------------------------------------
 
 Source [file](file:///Users/or226/Documents/Work/Research/Bats/Metapopulation/Metapop DDD SIR 2 adaptivetau.R).
 
+Here I show results from series 3. I introduced two pathogen strains with the same $R_0$ but different infectious periods: the "acute" strain has an average infectious period of 1 month, and the "slow" strain 2 months. I varied the number of patches between 2 and 12 with a migration rate of 0.01 and a local carrying capacity of 5,000. Pulse tightness was either 1 or 10. The "acute" strain was introduced in patch 1 and the "slow" strain in eithe rpatch 2 or patch 7.
+
+```{r, echo=FALSE, fig.cap="Figure 11. Probability of global extinction for each strain, depending on metapopulation size and tightness of birth pulse."}
+load("~/Documents/Work/Research/Bats/Metapopulation/DDD SIR 2 strains/Metapop DDD SIR 2 Series 3 Extinction.RData")
+SIR.2.series.3.P.ext$CI.min <- qbinom(0.025,100,SIR.2.series.3.P.ext$P.ext)/100
+SIR.2.series.3.P.ext$CI.max <- qbinom(0.975,100,SIR.2.series.3.P.ext$P.ext)/100
+SIR.2.series.3.P.ext$Strain.names <- ifelse(SIR.2.series.3.P.ext$Strain=='x',"Acute","Slow")
+
+ggplot(SIR.2.series.3.P.ext, aes(factor(s),P.ext,fill=Strain.names)) + geom_bar(stat="identity",position='dodge') + facet_grid(Patches~., labeller=label_both) + labs(fill="Strain") + ylab("Probability of extinction") + xlab("Birth pulse tightness (s)") + theme(text=element_text(size=18)) + geom_errorbar(aes(ymin=CI.min,ymax=CI.max),position=position_dodge(0.9),width=0.2) + scale_fill_manual(values=c("red","cyan3"))
+```
+
+```{r, echo=FALSE, fig.width=9, fig.cap="Figure 12. Average (conditional on non-extinction) proportion of patches infected with either strain through time, with 12 patches. Left: loose birth pulse (s=1), right: tight birth pulse (s=10)."}
+load("~/Documents/Work/Research/Bats/Metapopulation/DDD SIR 2 strains/Metapop DDD SIR 2 Series 3 Occupancy.RData")
+DDD.SIR.2.series.3.occupancy$Strain.names <- ifelse(DDD.SIR.2.series.3.occupancy$Strain=='x',"Acute","Slow")
+
+ggplot(DDD.SIR.2.series.3.occupancy %>% filter(Patches==12), aes(Time,Avg)) + geom_line(aes(col=Strain.names),size=1.5) + facet_grid(~s, labeller=label_both)+ labs(color="Strain")+ scale_color_manual(values=c("red","cyan3"))+ theme(text=element_text(size=18)) + ylab("Average number of infected patches")
+```
 
 
 
@@ -395,7 +425,7 @@ __------------------------------------------------------------------------------
 
 - Estimate lag between patches
 
-### Further series
+## Further series
 
 - Can high migration rates reduce phase variations?
 	+ The deterministic model suggests this may not be the case, at least when all patches have the same pulse tightness $s$. 
@@ -408,11 +438,8 @@ __------------------------------------------------------------------------------
 	+ longer life-span 
 	+ lower R0
 	
-### Empirical motivation
 
-- Review case studies to identify relevant questions
-	
-### Pathogen evolution
+## Pathogen evolution
 
 A simple idea would be to consider the $\beta-\gamma$ trade-off: for a given $R_0$, is a longer infectious period advantageous?
 
@@ -425,3 +452,10 @@ A simple idea would be to consider the $\beta-\gamma$ trade-off: for a given $R_
 - Of marginal interest, two modelling papers considered the emergence of a $\beta-\gamma$ trade-off from within-host dynamics: Alizon (2008) and King et al (2009).
 
 Here it would probably make sense to introduce two different strains in two different patches. 
+
+
+## Maternal immunity
+
+As discussed with Ali and Raina, this would be a relevant extention of the model.
+
+
