@@ -13,4 +13,4 @@ The three key source files that implement the three models (as of August 2015) a
 
 - "Metapop DDD SIR adaptivetau.R": extension to two pathogen strains with no antigenic variations (perfect cross-protection).
 
-All other files containing the word "series" have been used to run series of simulations from each of tht three models, or analyse the resulting simulations. 
+All other files containing the word "series" have been used to run series of simulations from each of the three models, or analyse the resulting simulations. Note that I have not uploaded the output files from those simulation series as these are quite large.
