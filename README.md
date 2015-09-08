@@ -11,6 +11,6 @@ The three key source files that implement the three models (as of August 2015) a
 
 - "Metapop DDD SIR adaptivetau.R": adds a second, density-dependent mortality term to prevent exponential increase in population sizes when birth pulses vary across the metapopulation.
 
-- "Metapop DDD SIR adaptivetau.R": extension to two pathogen strains with no antigenic variations (perfect cross-protection).
+- "Metapop DDD SIR 2 adaptivetau.R": extension to two pathogen strains with no antigenic variations (perfect cross-protection).
 
 All other files containing the word "series" have been used to run series of simulations from each of the three models, or analyse the resulting simulations. Note that I have not uploaded the output files from those simulation series as these are quite large.
